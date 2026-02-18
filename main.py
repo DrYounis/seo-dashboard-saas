@@ -436,7 +436,30 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+    """Enhanced health check with startup delay"""
+    import time
+    startup_time = getattr(health, '_startup_time', None)
+    if startup_time is None:
+        health._startup_time = time.time()
+    
+    elapsed = time.time() - health._startup_time
+    if elapsed < 5:  # 5 second startup grace period
+        return JSONResponse(
+            status_code=503,
+            content={"status": "starting", "message": f"Service starting ({elapsed:.1f}s)"}
+        )
+    
+    # Check cache health
+    try:
+        from main import _cache_hits, _cache_misses
+        cache_hit_rate = _cache_hits / max(_cache_hits + _cache_misses, 1) * 100
+        cache_status = "healthy" if cache_hit_rate > 0 else "empty"
+    except:
+        cache_status = "unknown"
+    
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat(), 
+            "uptime": f"{elapsed:.1f}s", "service": "seo-dashboard-saas",
+            "cache_status": cache_status, "active_users": len(users_db)}
 
 @app.get("/plans")
 async def get_plans():
