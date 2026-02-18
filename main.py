@@ -106,12 +106,15 @@ class TokenBucket:
 
 _rate_limiters: Dict[str, TokenBucket] = {}
 
+# ── Service startup time tracking ─────────────────────────────────────────────
+_service_start_time: float = time.time()
+
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="SEO Dashboard API", description="AI-powered SEO analysis SaaS", version="1.0.0")
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Application starting up...")
+    logger.info("SEO Dashboard API starting up...")
     logger.info(f"Available routes: {[route.path for route in app.routes]}")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
@@ -436,30 +439,25 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Enhanced health check with startup delay"""
-    import time
-    startup_time = getattr(health, '_startup_time', None)
-    if startup_time is None:
-        health._startup_time = time.time()
-    
-    elapsed = time.time() - health._startup_time
-    if elapsed < 5:  # 5 second startup grace period
+    """Health check with startup grace period. Uses module-level globals for cache stats."""
+    elapsed = time.time() - _service_start_time
+    if elapsed < 5:  # 5-second startup grace period
         return JSONResponse(
             status_code=503,
-            content={"status": "starting", "message": f"Service starting ({elapsed:.1f}s)"}
+            content={"status": "starting", "message": f"Service starting ({elapsed:.1f}s)"},
         )
-    
-    # Check cache health
-    try:
-        from main import _cache_hits, _cache_misses
-        cache_hit_rate = _cache_hits / max(_cache_hits + _cache_misses, 1) * 100
-        cache_status = "healthy" if cache_hit_rate > 0 else "empty"
-    except:
-        cache_status = "unknown"
-    
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat(), 
-            "uptime": f"{elapsed:.1f}s", "service": "seo-dashboard-saas",
-            "cache_status": cache_status, "active_users": len(users_db)}
+    # Reference module-level cache counters directly (no self-import needed)
+    cache_hit_rate = _cache_hits / max(_cache_hits + _cache_misses, 1) * 100
+    cache_status = "warm" if _cache_hits > 0 else "empty"
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "uptime": f"{elapsed:.1f}s",
+        "service": "seo-dashboard-saas",
+        "cache_status": cache_status,
+        "cache_hit_rate": round(cache_hit_rate, 1),
+        "active_users": len(users_db),
+    }
 
 @app.get("/plans")
 async def get_plans():
@@ -546,10 +544,9 @@ async def stripe_webhook(request_body: bytes, stripe_signature: str = Header(Non
         session = event["data"]["object"]
         email = session.get("customer_email") or session.get("metadata", {}).get("email", "")
         plan = session.get("metadata", {}).get("plan", "starter")
-        import secrets
         api_key = f"seo_{secrets.token_urlsafe(32)}"
         users_db[api_key] = {"email": email, "plan": plan, "api_key": api_key, "created_at": datetime.utcnow().isoformat(), "reports_this_month": 0}
-        print(f"✅ New SEO user: {email} | Plan: {plan}")
+        logger.info(f"New SEO user registered: {email} | Plan: {plan}")
     return {"received": True}
 
 @app.get("/success")
