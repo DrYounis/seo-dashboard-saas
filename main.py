@@ -100,6 +100,10 @@ _rate_limiters: Dict[str, TokenBucket] = {}
 app = FastAPI(title="SEO Dashboard API", description="AI-powered SEO analysis SaaS", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # ── Models ────────────────────────────────────────────────────────────────────
 class DomainRequest(BaseModel):
     domain: str
