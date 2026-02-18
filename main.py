@@ -17,9 +17,19 @@ from typing import Optional, Dict, List
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 import uvicorn
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
 # ── Stripe ────────────────────────────────────────────────────────────────────
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
@@ -98,11 +108,17 @@ _rate_limiters: Dict[str, TokenBucket] = {}
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="SEO Dashboard API", description="AI-powered SEO analysis SaaS", version="1.0.0")
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Application starting up...")
+    logger.info(f"Available routes: {[route.path for route in app.routes]}")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    logger.info("Health check endpoint accessed")
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 # ── Models ────────────────────────────────────────────────────────────────────
 class DomainRequest(BaseModel):
