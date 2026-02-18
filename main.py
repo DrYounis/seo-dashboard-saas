@@ -1,6 +1,7 @@
 """
-SEO Dashboard SaaS — FastAPI Backend
+SEO Dashboard SaaS — FastAPI Backend v2.0
 Domain overview, keyword research, site audit with Stripe billing
+Upgrades (R&D Week 1): LLM caching, token-bucket rate limiting, metrics
 """
 import os
 import re
@@ -8,11 +9,13 @@ import json
 import time
 import stripe
 import hashlib
+import secrets
 import requests
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
-from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
+from collections import defaultdict
+from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
@@ -51,6 +54,48 @@ PLANS = {
 users_db: Dict[str, dict] = {}
 reports_db: Dict[str, list] = {}
 
+# ── R&D Upgrade: LLM Response Cache (saves repeated API calls) ────────────────
+_analysis_cache: Dict[str, dict] = {}
+_cache_hits = 0
+_cache_misses = 0
+
+def cache_get(key: str) -> Optional[dict]:
+    global _cache_hits, _cache_misses
+    if key in _analysis_cache:
+        entry = _analysis_cache[key]
+        # Cache valid for 24 hours
+        if time.time() - entry["cached_at"] < 86400:
+            _cache_hits += 1
+            return entry["data"]
+    _cache_misses += 1
+    return None
+
+def cache_set(key: str, data: dict):
+    _analysis_cache[key] = {"data": data, "cached_at": time.time()}
+
+# ── R&D Upgrade: Token Bucket Rate Limiting Per Plan ─────────────────────────
+class TokenBucket:
+    """Token bucket for per-user rate limiting"""
+    PLAN_RATES = {"starter": 0.05, "professional": 0.2, "agency": 1.0}  # req/sec
+    PLAN_BURST = {"starter": 3, "professional": 10, "agency": 30}
+
+    def __init__(self, plan: str = "starter"):
+        self.rate = self.PLAN_RATES.get(plan, 0.05)
+        self.capacity = self.PLAN_BURST.get(plan, 3)
+        self.tokens = float(self.capacity)
+        self.last_refill = time.time()
+
+    def consume(self) -> bool:
+        now = time.time()
+        self.tokens = min(self.capacity, self.tokens + (now - self.last_refill) * self.rate)
+        self.last_refill = now
+        if self.tokens >= 1:
+            self.tokens -= 1
+            return True
+        return False
+
+_rate_limiters: Dict[str, TokenBucket] = {}
+
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="SEO Dashboard API", description="AI-powered SEO analysis SaaS", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -82,6 +127,12 @@ def check_quota(user: dict = Depends(get_current_user)):
     used = user.get("reports_this_month", 0)
     if limit != -1 and used >= limit:
         raise HTTPException(status_code=429, detail=f"Monthly quota exceeded ({used}/{limit}). Upgrade your plan.")
+    # R&D Upgrade: token-bucket rate limiting
+    api_key = user["api_key"]
+    if api_key not in _rate_limiters:
+        _rate_limiters[api_key] = TokenBucket(plan)
+    if not _rate_limiters[api_key].consume():
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Slow down or upgrade your plan.")
     return user
 
 def increment_usage(user: dict):
@@ -378,8 +429,15 @@ async def get_plans():
 
 @app.post("/domain")
 async def domain_overview(request: DomainRequest, user: dict = Depends(check_quota)):
-    """Analyze a domain for SEO signals"""
+    """Analyze a domain for SEO signals (with caching)"""
+    # R&D Upgrade: check cache first
+    cache_key = hashlib.sha256(request.domain.lower().encode()).hexdigest()
+    cached = cache_get(cache_key)
+    if cached:
+        cached["from_cache"] = True
+        return cached
     result = analyze_domain(request.domain)
+    cache_set(cache_key, result)
     increment_usage(user)
     api_key = user["api_key"]
     if api_key not in reports_db:
@@ -461,6 +519,19 @@ async def success():
     return HTMLResponse("""<html><head><title>Welcome!</title>
     <style>body{font-family:sans-serif;text-align:center;padding:80px;background:#07071a;color:white;}h1{color:#7c3aed;}a{color:#7c3aed;}</style></head>
     <body><h1>🎉 Welcome to SEO Dashboard!</h1><p>Check your email for your API key.</p><p><a href="/">Go to Dashboard →</a></p></body></html>""")
+
+@app.get("/metrics")
+async def get_metrics():
+    """Internal metrics endpoint for monitoring"""
+    return {
+        "cache_hits": _cache_hits,
+        "cache_misses": _cache_misses,
+        "cache_hit_rate": round(_cache_hits / max(_cache_hits + _cache_misses, 1) * 100, 1),
+        "cached_entries": len(_analysis_cache),
+        "active_users": len(users_db),
+        "rate_limiters": len(_rate_limiters),
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8002, reload=True)
