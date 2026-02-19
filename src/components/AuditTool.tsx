@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api, type AuditResult } from '@/lib/api';
 import { CheckCircle, AlertTriangle, XCircle, Search } from 'lucide-react';
 
-export default function AuditTool() {
+export default function AuditTool({ apiKey }: { apiKey: string }) {
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<AuditResult | null>(null);
@@ -16,7 +16,7 @@ export default function AuditTool() {
         setError('');
         setData(null);
         try {
-            const res = await api.auditSite(url);
+            const res = await api.auditSite(apiKey, url);
             setData(res);
         } catch (err: any) {
             setError(err.message || 'Audit failed');

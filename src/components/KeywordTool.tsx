@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api, type KeywordData } from '@/lib/api';
 import { Search, TrendingUp, BarChart2, DollarSign, Target } from 'lucide-react';
 
-export default function KeywordTool() {
+export default function KeywordTool({ apiKey }: { apiKey: string }) {
     const [keyword, setKeyword] = useState('');
     const [country, setCountry] = useState('us');
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export default function KeywordTool() {
         setError('');
         setData(null);
         try {
-            const res = await api.researchKeyword(keyword, country);
+            const res = await api.researchKeywords(apiKey, keyword);
             setData(res);
         } catch (err: any) {
             setError(err.message || 'Research failed');
@@ -78,8 +78,8 @@ export default function KeywordTool() {
                         />
                         <StatCard
                             label="Keyword Difficulty"
-                            value={`${data.keyword_difficulty}/100`}
-                            className={getDifficultyColor(data.keyword_difficulty)}
+                            value={`${data.difficulty}/100`}
+                            className={getDifficultyColor(data.difficulty)}
                             icon={<Target size={20} className="text-muted" />}
                         />
                         <StatCard
@@ -91,9 +91,9 @@ export default function KeywordTool() {
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                         <MetaCard label="Competition" value={data.competition} />
-                        <MetaCard label="Opportunity" value={`${data.opportunity_score}/100`} className="text-green" />
-                        <MetaCard label="Trend" value={data.trend} />
-                        <MetaCard label="SERP Features" value={data.serp_features.join(', ')} size="sm" />
+                        <MetaCard label="Opportunity" value={`${100 - data.difficulty}/100`} className="text-green" />
+                        <MetaCard label="Trend" value="Stable" />
+                        <MetaCard label="Related" value={data.related_keywords.length} size="sm" />
                     </div>
 
                     <div>

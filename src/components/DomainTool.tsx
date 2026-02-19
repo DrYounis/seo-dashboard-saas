@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api, type DomainAnalysis } from '@/lib/api';
 import { Search, Globe, Shield, Clock, FileText, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
-export default function DomainTool() {
+export default function DomainTool({ apiKey }: { apiKey: string }) {
     const [domain, setDomain] = useState('');
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<DomainAnalysis | null>(null);
@@ -16,7 +16,7 @@ export default function DomainTool() {
         setError('');
         setData(null);
         try {
-            const res = await api.analyzeDomain(domain);
+            const res = await api.analyzeDomain(apiKey, domain);
             setData(res);
         } catch (err: any) {
             setError(err.message || 'Analysis failed');
