@@ -116,7 +116,15 @@ app = FastAPI(title="SEO Dashboard API", description="AI-powered SEO analysis Sa
 async def startup_event():
     logger.info("SEO Dashboard API starting up...")
     logger.info(f"Available routes: {[route.path for route in app.routes]}")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# CORS: allow_credentials must be False when allow_origins=["*"] (CORS spec requirement)
+# Set ALLOWED_ORIGINS env var to restrict to specific domains in production.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ── Models ────────────────────────────────────────────────────────────────────
 class DomainRequest(BaseModel):
