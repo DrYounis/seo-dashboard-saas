@@ -674,6 +674,8 @@
             }
         }
     </style>
+    <!-- SECURITY: Added DOMPurify for XSS Protection -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 </head>
 
 <body>
@@ -898,7 +900,7 @@
                 html += `<p class="section-label">💡 Recommendations</p><div class="tag-list">${d.recommendations.map(r => `<span class="tag tag-rec">${r}</span>`).join('')}</div>`;
             }
             const el = document.getElementById('domainResult');
-            el.innerHTML = html;
+            el.innerHTML = DOMPurify.sanitize(html);
             el.style.display = 'block';
         }
 
@@ -949,7 +951,7 @@
           </li>`).join('')}
       </ul>`;
             const el = document.getElementById('kwResult');
-            el.innerHTML = html;
+            el.innerHTML = DOMPurify.sanitize(html);
             el.style.display = 'block';
         }
 
@@ -1001,7 +1003,7 @@
             html += '</div>';
 
             const el = document.getElementById('auditResult');
-            el.innerHTML = html;
+            el.innerHTML = DOMPurify.sanitize(html);
             el.style.display = 'block';
         }
 

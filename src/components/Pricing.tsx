@@ -1,23 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { SUBSCRIPTION_PLANS, stripePromise } from '@/lib/stripe';
+import { SUBSCRIPTION_PLANS } from '@/lib/pricing';
+import { api } from '@/lib/api';
 import { Check } from 'lucide-react';
 
 export default function Pricing() {
     const [loading, setLoading] = useState<string | null>(null);
 
-    const handleCheckout = async (priceId: string) => {
-        setLoading(priceId);
+    const handleCheckout = async (planId: string) => {
+        setLoading(planId);
         try {
-            const res = await fetch('/api/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ priceId, email: 'user@example.com' }), // TODO: Get real email from auth
-            });
-            const { sessionId } = await res.json();
-            const stripe = await stripePromise;
-            await (stripe as any)?.redirectToCheckout({ sessionId });
+            // TODO: Get real email from auth
+            const result = await api.checkout(planId, 'user@example.com');
+            if (result.checkout_url) {
+                window.location.href = result.checkout_url;
+            }
         } catch (err) {
             console.error('Checkout failed:', err);
         } finally {

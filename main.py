@@ -7,7 +7,7 @@ import os
 import re
 import json
 import time
-import stripe
+import base64
 import hashlib
 import secrets
 import requests
@@ -18,7 +18,7 @@ from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 import logging
 import sys
@@ -31,30 +31,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Stripe ────────────────────────────────────────────────────────────────────
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+# ── Moyasar ───────────────────────────────────────────────────────────────────
+MOYASAR_SECRET_KEY = os.getenv("MOYASAR_SECRET_KEY", "")
 
 # ── Plans ─────────────────────────────────────────────────────────────────────
 PLANS = {
     "starter": {
         "name": "Starter",
         "price": 49,
-        "price_id": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
         "reports_per_month": 10,
         "features": ["10 reports/month", "Domain overview", "Keyword research", "PDF export", "Email support"],
     },
     "professional": {
         "name": "Professional",
         "price": 149,
-        "price_id": os.getenv("STRIPE_PRO_PRICE_ID", ""),
         "reports_per_month": 50,
         "features": ["50 reports/month", "Site audit", "Competitor analysis", "API access", "Priority support"],
     },
     "agency": {
         "name": "Agency",
         "price": 499,
-        "price_id": os.getenv("STRIPE_AGENCY_PRICE_ID", ""),
         "reports_per_month": -1,
         "features": ["Unlimited reports", "White-label", "Team seats (10)", "Custom branding", "Dedicated support"],
     },
@@ -112,34 +108,45 @@ _service_start_time: float = time.time()
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="SEO Dashboard API", description="AI-powered SEO analysis SaaS", version="1.0.0")
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
 @app.on_event("startup")
 async def startup_event():
-    logger.info("SEO Dashboard API starting up...")
+    logger.info("SECURITY: SEO Dashboard API starting up with enhanced protections...")
     logger.info(f"Available routes: {[route.path for route in app.routes]}")
 # CORS: allow_credentials must be False when allow_origins=["*"] (CORS spec requirement)
-# Set ALLOWED_ORIGINS env var to restrict to specific domains in production.
+# Limit allowed_origins to explicit sources
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()],
+    allow_origins=[o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o.strip()],
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # ── Models ────────────────────────────────────────────────────────────────────
 class DomainRequest(BaseModel):
-    domain: str
+    domain: str = Field(..., max_length=100, pattern=r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 class KeywordRequest(BaseModel):
-    keyword: str
-    country: Optional[str] = "us"
+    keyword: str = Field(..., max_length=100, min_length=2)
+    country: Optional[str] = Field("us", max_length=2)
 
 class AuditRequest(BaseModel):
-    url: str
+    url: str = Field(..., max_length=2000, pattern=r"^https?://")
 
 class CheckoutRequest(BaseModel):
-    plan: str
-    email: str
+    plan: str = Field(..., max_length=20)
+    email: str = Field(..., max_length=100, pattern=r"^[^@]+@[^@]+\.[^@]+$")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 def get_current_user(x_api_key: str = Header(None)):
@@ -520,48 +527,88 @@ async def get_history(user: dict = Depends(get_current_user)):
         "quota_limit": PLANS.get(user.get("plan", "starter"), PLANS["starter"])["reports_per_month"],
     }
 
-@app.post("/checkout")
+_checkout_rate_limiters: Dict[str, TokenBucket] = {}
+
+def check_checkout_rate_limit(request: Request):
+    ip = request.client.host if request.client else "unknown"
+    if ip not in _checkout_rate_limiters:
+        _checkout_rate_limiters[ip] = TokenBucket(plan="starter")
+    if not _checkout_rate_limiters[ip].consume():
+        logger.warning(f"SECURITY: Rate limit hit for /checkout from IP {ip}")
+        raise HTTPException(status_code=429, detail="Too many checkout attempts. Please try again later.")
+
+@app.post("/checkout", dependencies=[Depends(check_checkout_rate_limit)])
 async def create_checkout(request: CheckoutRequest):
     plan = request.plan.lower()
     if plan not in PLANS:
         raise HTTPException(status_code=400, detail=f"Invalid plan: {plan}")
-    price_id = PLANS[plan]["price_id"]
-    if not price_id:
-        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    plan_info = PLANS[plan]
+    amount = plan_info["price"] * 100  # Moyasar expects amount in Halalas
+    
+    base_url = os.getenv("BASE_URL", "http://localhost:8002")
+    callback_url = f"{base_url}/success?plan={plan}&email={request.email}"
+    
+    auth_token = base64.b64encode(f"{MOYASAR_SECRET_KEY}:".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {auth_token}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    data = {
+        "amount": amount,
+        "currency": "SAR",
+        "description": f"SEO Dashboard {plan.capitalize()} Plan",
+        "callback_url": callback_url
+    }
+    
     try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            mode="subscription",
-            customer_email=request.email,
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url=os.getenv("BASE_URL", "http://localhost:8002") + "/success",
-            cancel_url=os.getenv("BASE_URL", "http://localhost:8002") + "/#pricing",
-            metadata={"plan": plan, "email": request.email},
-        )
-        return {"checkout_url": session.url}
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/webhook")
-async def stripe_webhook(request_body: bytes, stripe_signature: str = Header(None)):
-    try:
-        event = stripe.Webhook.construct_event(request_body, stripe_signature, STRIPE_WEBHOOK_SECRET)
+        resp = requests.post("https://api.moyasar.com/v1/invoices", headers=headers, data=data)
+        if not resp.ok:
+            raise HTTPException(status_code=400, detail=f"Moyasar Error: {resp.text}")
+        invoice = resp.json()
+        return {"checkout_url": invoice["url"]}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        email = session.get("customer_email") or session.get("metadata", {}).get("email", "")
-        plan = session.get("metadata", {}).get("plan", "starter")
-        api_key = f"seo_{secrets.token_urlsafe(32)}"
-        users_db[api_key] = {"email": email, "plan": plan, "api_key": api_key, "created_at": datetime.utcnow().isoformat(), "reports_this_month": 0}
-        logger.info(f"New SEO user registered: {email} | Plan: {plan}")
-    return {"received": True}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/success")
-async def success():
-    return HTMLResponse("""<html><head><title>Welcome!</title>
-    <style>body{font-family:sans-serif;text-align:center;padding:80px;background:#07071a;color:white;}h1{color:#7c3aed;}a{color:#7c3aed;}</style></head>
-    <body><h1>🎉 Welcome to SEO Dashboard!</h1><p>Check your email for your API key.</p><p><a href="/">Go to Dashboard →</a></p></body></html>""")
+async def payment_success(id: str, status: str, plan: str = "starter", email: str = ""):
+    """Post-payment success callback from Moyasar"""
+    if status != "paid":
+        return HTMLResponse("<h1>Payment Failed or Cancelled</h1><p><a href='/'>Go back</a></p>", status_code=400)
+    
+    auth_token = base64.b64encode(f"{MOYASAR_SECRET_KEY}:".encode()).decode()
+    headers = {"Authorization": f"Basic {auth_token}"}
+    
+    try:
+        resp = requests.get(f"https://api.moyasar.com/v1/invoices/{id}", headers=headers)
+        if not resp.ok or resp.json().get("status") != "paid":
+            return HTMLResponse("<h1>Invoice Verification Failed</h1><p><a href='/'>Go back</a></p>", status_code=400)
+    except Exception:
+        return HTMLResponse("<h1>Error verifying payment</h1><p><a href='/'>Go back</a></p>", status_code=500)
+        
+    api_key = f"seo_{secrets.token_urlsafe(32)}"
+    users_db[api_key] = {
+        "email": email, 
+        "plan": plan, 
+        "api_key": api_key, 
+        "created_at": datetime.utcnow().isoformat(), 
+        "reports_this_month": 0
+    }
+    logger.info(f"New SEO user registered via Moyasar: {email} | Plan: {plan}")
+    
+    return HTMLResponse(f"""
+    <html><head><title>Welcome!</title>
+    <style>body{{font-family:sans-serif;text-align:center;padding:80px;background:#07071a;color:white;}}
+    h1{{color:#7c3aed;}} a{{color:#7c3aed;}} .key-box{{background:#1a1a2e;padding:15px;border-radius:8px;display:inline-block;margin:20px 0;font-family:monospace;}}
+    </style></head>
+    <body>
+    <h1>🎉 Welcome to SEO Dashboard!</h1>
+    <p>Your subscription is active. Here is your new API Key (keep it secret!):</p>
+    <div class="key-box"><strong>{api_key}</strong></div>
+    <p><a href="/">Go to Dashboard →</a></p>
+    </body></html>
+    """)
 
 @app.get("/metrics")
 async def get_metrics():
