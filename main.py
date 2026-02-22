@@ -1,6 +1,6 @@
 """
 SEO Dashboard SaaS — FastAPI Backend v2.0
-Domain overview, keyword research, site audit with Stripe billing
+Domain overview, keyword research, site audit with Moyasar billing
 Upgrades (R&D Week 1): LLM caching, token-bucket rate limiting, metrics
 """
 import os
@@ -38,19 +38,19 @@ MOYASAR_SECRET_KEY = os.getenv("MOYASAR_SECRET_KEY", "")
 PLANS = {
     "starter": {
         "name": "Starter",
-        "price": 49,
+        "price": 190,
         "reports_per_month": 10,
         "features": ["10 reports/month", "Domain overview", "Keyword research", "PDF export", "Email support"],
     },
     "professional": {
         "name": "Professional",
-        "price": 149,
+        "price": 490,
         "reports_per_month": 50,
         "features": ["50 reports/month", "Site audit", "Competitor analysis", "API access", "Priority support"],
     },
     "agency": {
         "name": "Agency",
-        "price": 499,
+        "price": 1490,
         "reports_per_month": -1,
         "features": ["Unlimited reports", "White-label", "Team seats (10)", "Custom branding", "Dedicated support"],
     },
