@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI R&D Dashboard — Weekly Intelligence System</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet" />
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #07071a;
+            --surface: #0f0f2e;
+            --card: #13132b;
+            --border: rgba(139, 92, 246, 0.2);
+            --purple: #8b5cf6;
+            --purple-light: #c4b5fd;
+            --cyan: #06b6d4;
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+            --orange: #f97316;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(7, 7, 26, 0.95);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--purple-light);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 999px;
+            padding: 0.3rem 0.9rem;
+            font-size: 0.8rem;
+            color: var(--green);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .4
+            }
+        }
+
+        .btn {
+            padding: 0.5rem 1.2rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all .2s;
+        }
+
+        .btn-primary {
+            background: var(--purple);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #7c3aed;
+            transform: translateY(-1px);
+        }
+
+        .btn-sm {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            border-right: 1px solid var(--border);
+            padding: 1.5rem 1rem;
+            background: var(--surface);
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--muted);
+            margin-bottom: 0.75rem;
+            padding: 0 0.5rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--muted);
+            transition: all .2s;
+            margin-bottom: 0.2rem;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(139, 92, 246, 0.12);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            color: var(--purple-light);
+        }
+
+        .nav-item .icon {
+            font-size: 1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Stats in sidebar */
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--purple-light);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 0.2rem;
+        }
+
+        /* Main content */
+        .main {
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 0.3rem;
+        }
+
+        .page-header p {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        /* Trend items */
+        .trend-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .trend-item:last-child {
+            border-bottom: none;
+        }
+
+        .trend-badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .badge-model {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--purple-light);
+        }
+
+        .badge-framework {
+            background: rgba(6, 182, 212, 0.2);
+            color: var(--cyan);
+        }
+
+        .badge-pattern {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--green);
+        }
+
+        .badge-tool {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--yellow);
+        }
+
+        .badge-security {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+        }
+
+        .trend-content {
+            flex: 1;
+        }
+
+        .trend-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .trend-meta {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .relevance-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.3rem;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 4px;
+            background: var(--surface);
+            border-radius: 2px;
+            max-width: 100px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: linear-gradient(90deg, var(--purple), var(--cyan));
+        }
+
+        .bar-label {
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+
+        /* Upgrade items */
+        .upgrade-item {
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid var(--green);
+        }
+
+        .upgrade-item.moderate {
+            border-left-color: var(--yellow);
+        }
+
+        .upgrade-item.breaking {
+            border-left-color: var(--red);
+        }
+
+        .upgrade-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .upgrade-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .upgrade-desc {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .code-preview {
+            background: #0d0d1f;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: #c9d1d9;
+            overflow-x: auto;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        /* Report viewer */
+        .report-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .report-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background .2s;
+        }
+
+        .report-item:hover {
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .report-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .report-meta {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .report-content {
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 1.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -1.65rem;
+            top: 4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--purple);
+            border: 2px solid var(--bg);
+        }
+
+        .timeline-date {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-bottom: 0.3rem;
+        }
+
+        .timeline-content {
+            font-size: 0.9rem;
+        }
+
+        /* Loader */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--muted);
+        }
+
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+        }
+
+        /* Floating WhatsApp Button */
+        .whatsapp-float {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #25D366;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            text-decoration: none;
+        }
+
+        .whatsapp-float:hover {
+            background: #20BA5A;
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(37, 211, 102, 0.6);
+        }
+
+        .whatsapp-float .tooltip {
+            position: absolute;
+            right: 70px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .whatsapp-float:hover .tooltip {
+            opacity: 1;
+        }
+
+        @keyframes pulse-whatsapp {
+            0%, 100% {
+                box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+            }
+            50% {
+                box-shadow: 0 4px 20px rgba(37, 211, 102, 0.8);
+            }
+        }
+
+        .whatsapp-float {
+            animation: pulse-whatsapp 2s infinite;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="logo">🔬 AI R&D Intelligence</div>
+        <div style="display:flex;align-items:center;gap:1rem">
+            <div class="status-pill">
+                <div class="status-dot"></div><span id="statusText">Loading...</span>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="triggerRun()" id="runBtn">▶ Run Now</button>
+        </div>
+    </nav>
+
+    <!-- Floating WhatsApp Button -->
+    <a href="https://wa.me/966555056545?text=Hi%2C%20I%20need%20help%20with%20the%20AI%20R%26D%20System" 
+       class="whatsapp-float" 
+       target="_blank" 
+       rel="noopener noreferrer"
+       title="Chat on WhatsApp">
+        💬
+        <span class="tooltip">Chat on WhatsApp</span>
+    </a>
+
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Navigation</div>
+                <div class="nav-item active" onclick="showPage('overview')" id="nav-overview">
+                    <span class="icon">📊</span> Overview
+                </div>
+                <div class="nav-item" onclick="showPage('trends')" id="nav-trends">
+                    <span class="icon">📡</span> Trends
+                </div>
+                <div class="nav-item" onclick="showPage('upgrades')" id="nav-upgrades">
+                    <span class="icon">⚡</span> Upgrades
+                </div>
+                <div class="nav-item" onclick="showPage('reports')" id="nav-reports">
+                    <span class="icon">📝</span> Reports
+                </div>
+                <div class="nav-item" onclick="showPage('schedule')" id="nav-schedule">
+                    <span class="icon">🗓️</span> Schedule
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">This Week</div>
+                <div class="stat-card">
+                    <div class="stat-value" id="weekNum">—</div>
+                    <div class="stat-label">Current Week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="upgradesCount">—</div>
+                    <div class="stat-label">Upgrades Applied</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="reportsCount">—</div>
+                    <div class="stat-label">Reports Generated</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+
+            <!-- OVERVIEW PAGE -->
+            <div class="page active" id="page-overview">
+                <div class="page-header">
+                    <h1>🔬 R&D Intelligence Overview</h1>
+                    <p>Autonomous AI trend research — runs every Monday, keeps your stack cutting-edge</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">How It Works</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem">
+                        <div style="text-align:center;padding:1rem">
+                            <div style="font-size:2rem;margin-bottom:0.5rem">📡</div>
+                            <div style="font-weight:700;margin-bottom:0.3rem">1. Scrape</div>
+                            <div style="font-size:0.8rem;color:var(--muted)">GitHub Trending, HN, AI papers — every
+                                Monday</div>
+                        </div>
+                        <div style="text-align:center;padding:1rem">
+                            <div style="font-size:2rem;margin-bottom:0.5rem">🧠</div>
+                            <div style="font-weight:700;margin-bottom:0.3rem">2. Analyze</div>
+                            <div style="font-size:0.8rem;color:var(--muted)">Groq LLM scores relevance to your stack
+                            </div>
+                        </div>
+                        <div style="text-align:center;padding:1rem">
+                            <div style="font-size:2rem;margin-bottom:0.5rem">⚡</div>
+                            <div style="font-weight:700;margin-bottom:0.3rem">3. Upgrade</div>
+                            <div style="font-size:0.8rem;color:var(--muted)">Generates ready-to-apply code improvements
+                            </div>
+                        </div>
+                        <div style="text-align:center;padding:1rem">
+                            <div style="font-size:2rem;margin-bottom:0.5rem">📧</div>
+                            <div style="font-weight:700;margin-bottom:0.3rem">4. Report</div>
+                            <div style="font-size:0.8rem;color:var(--muted)">Weekly digest emailed to you</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📅 Last Run</div>
+                    </div>
+                    <div id="lastRunInfo" style="color:var(--muted);font-size:0.9rem">Loading...</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🎯 What We Track</div>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+                        <span
+                            style="background:rgba(139,92,246,0.15);color:var(--purple-light);padding:0.3rem 0.8rem;border-radius:999px;font-size:0.8rem">🤖
+                            LLM Models</span>
+                        <span
+                            style="background:rgba(6,182,212,0.15);color:var(--cyan);padding:0.3rem 0.8rem;border-radius:999px;font-size:0.8rem">⚙️
+                            Frameworks</span>
+                        <span
+                            style="background:rgba(16,185,129,0.15);color:var(--green);padding:0.3rem 0.8rem;border-radius:999px;font-size:0.8rem">🏗️
+                            Patterns</span>
+                        <span
+                            style="background:rgba(245,158,11,0.15);color:var(--yellow);padding:0.3rem 0.8rem;border-radius:999px;font-size:0.8rem">🔧
+                            Tools</span>
+                        <span
+                            style="background:rgba(239,68,68,0.15);color:var(--red);padding:0.3rem 0.8rem;border-radius:999px;font-size:0.8rem">🔒
+                            Security</span>
+                        <span
+                            style="background:rgba(249,115,22,0.15);color:var(--orange);padding:0.3rem 0.8rem;border-radius:999px;font-size:0.8rem">💰
+                            SaaS Patterns</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🏆 Applied Upgrades History</div>
+                    </div>
+                    <div class="timeline" id="upgradeTimeline">
+                        <div style="color:var(--muted);font-size:0.9rem">No upgrades applied yet. Run the R&D cycle
+                            first.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TRENDS PAGE -->
+            <div class="page" id="page-trends">
+                <div class="page-header">
+                    <h1>📡 AI Trends Feed</h1>
+                    <p>Latest trends from GitHub, Hacker News, and research papers — scored for your stack</p>
+                </div>
+                <div class="card">
+                    <div id="trendsContent">
+                        <div class="empty-state">
+                            <div class="icon">📡</div>
+                            <p>Run the R&D cycle to populate trends</p>
+                            <button class="btn btn-primary" style="margin-top:1rem" onclick="triggerRun()">▶ Run
+                                Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UPGRADES PAGE -->
+            <div class="page" id="page-upgrades">
+                <div class="page-header">
+                    <h1>⚡ Code Upgrades</h1>
+                    <p>Ready-to-apply code improvements based on this week's trends</p>
+                </div>
+                <div id="upgradesContent">
+                    <div class="card">
+                        <div class="empty-state">
+                            <div class="icon">⚡</div>
+                            <p>Run the R&D cycle to generate upgrades</p>
+                            <button class="btn btn-primary" style="margin-top:1rem" onclick="triggerRun()">▶ Run
+                                Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTS PAGE -->
+            <div class="page" id="page-reports">
+                <div class="page-header">
+                    <h1>📝 Weekly Reports</h1>
+                    <p>Full R&D reports — click to read</p>
+                </div>
+                <div class="card">
+                    <div class="report-list" id="reportList">
+                        <div style="color:var(--muted);font-size:0.9rem">No reports yet. Run the R&D cycle first.</div>
+                    </div>
+                </div>
+                <div class="card" id="reportViewer" style="display:none">
+                    <div class="card-header">
+                        <div class="card-title" id="reportTitle">Report</div>
+                        <button class="btn btn-outline btn-sm"
+                            onclick="document.getElementById('reportViewer').style.display='none'">✕ Close</button>
+                    </div>
+                    <div class="report-content" id="reportContent"></div>
+                </div>
+            </div>
+
+            <!-- SCHEDULE PAGE -->
+            <div class="page" id="page-schedule">
+                <div class="page-header">
+                    <h1>🗓️ Schedule & Configuration</h1>
+                    <p>Set up automatic weekly R&D cycles</p>
+                </div>
+                <div class="card">
+                    <div class="card-title" style="margin-bottom:1rem">⏰ Cron Schedule</div>
+                    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem">Add this to your crontab to run
+                        every Monday at 8am:</p>
+                    <div class="code-preview" style="max-height:none">0 8 * * MON cd "/Volumes/Elements/AG/ai deveopers"
+                        && python rd_system.py >> rd_cron.log 2>&1</div>
+                    <p style="color:var(--muted);font-size:0.8rem;margin-top:0.75rem">Run <code
+                            style="background:var(--surface);padding:0.1rem 0.4rem;border-radius:4px">crontab -e</code>
+                        and paste the above line.</p>
+                </div>
+                <div class="card">
+                    <div class="card-title" style="margin-bottom:1rem">🔑 Environment Variables</div>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem">
+                        <div
+                            style="display:flex;justify-content:space-between;background:var(--surface);padding:0.75rem;border-radius:8px;font-size:0.85rem">
+                            <code>GROQ_API_KEY</code><span style="color:var(--muted)">For LLM trend analysis (free at
+                                console.groq.com)</span>
+                        </div>
+                        <div
+                            style="display:flex;justify-content:space-between;background:var(--surface);padding:0.75rem;border-radius:8px;font-size:0.85rem">
+                            <code>GITHUB_TOKEN</code><span style="color:var(--muted)">Higher GitHub API rate
+                                limits</span>
+                        </div>
+                        <div
+                            style="display:flex;justify-content:space-between;background:var(--surface);padding:0.75rem;border-radius:8px;font-size:0.85rem">
+                            <code>SENDGRID_API_KEY</code><span style="color:var(--muted)">Email weekly reports</span>
+                        </div>
+                        <div
+                            style="display:flex;justify-content:space-between;background:var(--surface);padding:0.75rem;border-radius:8px;font-size:0.85rem">
+                            <code>REPORT_EMAIL</code><span style="color:var(--muted)">Where to send weekly
+                                reports</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title" style="margin-bottom:1rem">📋 Manual Commands</div>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem">
+                        <div class="code-preview" style="max-height:none"># Run R&D cycle now
+                            python rd_system.py --force
+
+                            # Start dashboard server
+                            python rd_api.py
+
+                            # View latest report
+                            cat rd_reports/$(ls rd_reports/ | tail -1)</div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const API = 'http://localhost:8003';
+        let scriptDir = '/Volumes/Elements/AG/ai deveopers'; // Default fallback
+        let apiKey = localStorage.getItem('rd_dashboard_api_key') || '';
+
+        // Load dynamic config on startup
+        async function loadConfig() {
+            try {
+                const res = await fetch(`${API}/api/config`);
+                const config = await res.json();
+                scriptDir = config.script_dir || scriptDir;
+                updateCronPath();
+            } catch (e) {
+                console.log('Using default script path');
+            }
+        }
+
+        function updateCronPath() {
+            const cronElement = document.querySelector('.code-preview');
+            if (cronElement) {
+                cronElement.textContent = `0 8 * * MON cd "${scriptDir}" && python rd_system.py >> rd_cron.log 2>&1`;
+            }
+        }
+
+        function showPage(name) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('page-' + name).classList.add('active');
+            document.getElementById('nav-' + name).classList.add('active');
+        }
+
+        async function loadState() {
+            try {
+                const res = await fetch(`${API}/api/state`);
+                const state = await res.json();
+
+                document.getElementById('weekNum').textContent = state.week_number || '0';
+                document.getElementById('upgradesCount').textContent = (state.applied_upgrades || []).length;
+
+                if (state.last_run) {
+                    const d = new Date(state.last_run);
+                    document.getElementById('lastRunInfo').innerHTML = `
+          <strong>Last run:</strong> ${d.toLocaleString()}<br>
+          <strong>Week:</strong> ${state.week_number}<br>
+          <strong>Upgrades applied:</strong> ${(state.applied_upgrades || []).length}
+        `;
+                    document.getElementById('statusText').textContent = `Week ${state.week_number} complete`;
+
+                    // Timeline
+                    const timeline = document.getElementById('upgradeTimeline');
+                    const upgrades = state.applied_upgrades || [];
+                    if (upgrades.length) {
+                        timeline.innerHTML = upgrades.map(u => `
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-content">✅ ${u}</div>
+            </div>
+          `).join('');
+                    }
+                } else {
+                    document.getElementById('lastRunInfo').textContent = 'Never run. Click "Run Now" to start.';
+                    document.getElementById('statusText').textContent = 'Not yet run';
+                }
+            } catch (e) {
+                document.getElementById('statusText').textContent = 'API offline';
+                document.getElementById('lastRunInfo').textContent = 'Dashboard API not running. Start with: python rd_api.py';
+            }
+        }
+
+        async function loadReports() {
+            try {
+                const res = await fetch(`${API}/api/reports`);
+                const data = await res.json();
+                const list = document.getElementById('reportList');
+                document.getElementById('reportsCount').textContent = data.reports.length;
+
+                if (!data.reports.length) return;
+                list.innerHTML = data.reports.map(r => `
+        <div class="report-item" onclick="loadReport('${r.name}')">
+          <div>
+            <div class="report-name">📝 ${r.name}</div>
+            <div class="report-meta">${(r.size / 1024).toFixed(1)} KB</div>
+          </div>
+          <span style="color:var(--purple-light)">Read →</span>
+        </div>
+      `).join('');
+            } catch (e) { }
+        }
+
+        async function loadReport(name) {
+            try {
+                const res = await fetch(`${API}/api/reports/${name}`);
+                const data = await res.json();
+                document.getElementById('reportTitle').textContent = name;
+                document.getElementById('reportContent').textContent = data.content;
+                document.getElementById('reportViewer').style.display = 'block';
+                document.getElementById('reportViewer').scrollIntoView({ behavior: 'smooth' });
+            } catch (e) { }
+        }
+
+        async function loadUpgrades() {
+            try {
+                const res = await fetch(`${API}/api/upgrades`);
+                const data = await res.json();
+                const container = document.getElementById('upgradesContent');
+
+                if (!data.upgrades.length) return;
+                container.innerHTML = data.upgrades.map(u => `
+        <div class="upgrade-item">
+          <div class="upgrade-header">
+            <div class="upgrade-title">⚡ ${u.name.replace('.py', '').replace(/_/g, ' ')}</div>
+            <span style="font-size:0.75rem;color:var(--green)">🟢 Safe</span>
+          </div>
+          <div class="upgrade-desc">${(u.size / 1024).toFixed(1)} KB — Ready to apply</div>
+          <button class="btn btn-primary btn-sm" onclick="viewUpgrade('${u.name}')">View Code</button>
+        </div>
+      `).join('');
+            } catch (e) { }
+        }
+
+        async function viewUpgrade(name) {
+            try {
+                const res = await fetch(`${API}/api/upgrades/${name}`);
+                const data = await res.json();
+                alert(data.content.slice(0, 1000) + '...\n\nFull file: rd_upgrades/' + name);
+            } catch (e) { }
+        }
+
+        function promptApiKey() {
+            const key = prompt('Enter Dashboard API Key (set via DASHBOARD_API_KEY environment variable):');
+            if (key !== null) {
+                apiKey = key;
+                localStorage.setItem('rd_dashboard_api_key', key);
+            }
+        }
+
+        async function triggerRun() {
+            const btn = document.getElementById('runBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Running...';
+            document.getElementById('statusText').textContent = 'R&D cycle running...';
+
+            try {
+                const headers = {};
+                if (apiKey) {
+                    headers['X-API-Key'] = apiKey;
+                }
+                const res = await fetch(`${API}/api/run`, { 
+                    method: 'POST',
+                    headers: headers
+                });
+                
+                if (res.status === 401) {
+                    promptApiKey();
+                    btn.disabled = false;
+                    btn.textContent = '▶ Run Now';
+                    return;
+                }
+                
+                if (res.status === 429) {
+                    const data = await res.json();
+                    alert(data.detail || 'Rate limit exceeded. Please wait before running again.');
+                    btn.disabled = false;
+                    btn.textContent = '▶ Run Now';
+                    return;
+                }
+                
+                const data = await res.json();
+
+                // Poll for completion
+                setTimeout(async () => {
+                    await loadState();
+                    await loadReports();
+                    await loadUpgrades();
+                    btn.disabled = false;
+                    btn.textContent = '▶ Run Now';
+                }, 15000);
+            } catch (e) {
+                alert('API not running. Start with: python rd_api.py\nOr run directly: python rd_system.py --force');
+                btn.disabled = false;
+                btn.textContent = '▶ Run Now';
+            }
+        }
+
+        // Init
+        loadConfig();
+        loadState();
+        loadReports();
+        loadUpgrades();
+    </script>
+</body>
+
+</html>
